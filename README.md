@@ -223,6 +223,22 @@ ssh pi@<firewalla-ip> "crontab /home/pi/.firewalla/config/user_crontab"
 sudo /home/pi/.firewalla/config/post_main.d/start_log_shipping.sh
 ```
 
+### Fluent Bit running but no data flowing (stale position tracker)
+
+Zeek logs live on a tmpfs that's recreated on every reboot. Fluent Bit tracks
+its read position in `.db` files so it doesn't re-read old data. After a reboot,
+those position files point to byte offsets in files that no longer exist, so
+Fluent Bit silently reads nothing.
+
+The `start_log_shipping.sh` script now automatically wipes the position tracker
+on every startup, so this should be self-healing. If you somehow hit it anyway:
+
+```bash
+sudo docker rm -f fluent-bit-axiom
+sudo rm -rf /home/pi/.firewalla/config/fluent-bit-data/*
+sudo /home/pi/.firewalla/config/post_main.d/start_log_shipping.sh
+```
+
 ### Check RAM usage
 
 ```bash

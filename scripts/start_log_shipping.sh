@@ -50,6 +50,15 @@ fi
 # --- Create data directory for position tracking -----------------------------
 mkdir -p "${CONFIG_DIR}/fluent-bit-data"
 
+# --- Wipe stale position tracking data ---------------------------------------
+# Zeek logs live on a tmpfs that's recreated on every reboot. If Fluent Bit's
+# position tracker (*.db files) references byte offsets in files that no longer
+# exist, it silently reads nothing. This was the #1 cause of "data stopped
+# flowing" in production — hit it 3 times before adding this fix.
+echo "[log-shipping] Clearing stale position tracking data..."
+rm -f "${CONFIG_DIR}/fluent-bit-data"/*.db
+rm -f "${CONFIG_DIR}/fluent-bit-data"/*.offset
+
 # --- Pull image if needed ----------------------------------------------------
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     echo "[log-shipping] Pulling Fluent Bit image (first run)..."
