@@ -79,15 +79,17 @@ for key in $(redis-cli keys "host:mac:*" 2>/dev/null); do
     NAME=$(echo "$NAME" | tr -cd '[:alnum:] ._-')
     GROUP=$(echo "$GROUP" | tr -cd '[:alnum:] ._-')
 
+    # Lowercase MAC to match Zeek's orig_l2_addr format
+    MAC_LOWER=$(echo "$MAC" | tr '[:upper:]' '[:lower:]')
+
     if [ "$FIRST" = true ]; then
         FIRST=false
     else
-        echo "," >> "$TMPFILE"
+        printf ",\n" >> "$TMPFILE"
     fi
 
-    cat >> "$TMPFILE" <<EOF
-{"_time":"${TIMESTAMP}","record_type":"device_lookup","ipv4":"${IPV4}","name":"${NAME}","mac":"${MAC}","group":"${GROUP}","interface":"${INTF_PORT}"}
-EOF
+    printf '{"_time":"%s","record_type":"device_lookup","ipv4":"%s","name":"%s","mac":"%s","group":"%s","interface":"%s"}\n' \
+        "$TIMESTAMP" "$IPV4" "$NAME" "$MAC_LOWER" "$GROUP" "$INTF_PORT" >> "$TMPFILE"
 
 done
 
