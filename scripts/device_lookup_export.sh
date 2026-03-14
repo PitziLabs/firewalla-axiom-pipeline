@@ -2,8 +2,11 @@
 # =============================================================================
 # Firewalla Device Lookup Exporter
 #
-# Reads device inventory from Redis (host:mac:* keys), extracts IP-to-name
-# mappings, and ships them to Axiom as a lookup dataset. Run hourly via cron.
+# Reads device inventory from Redis (host:mac:* keys), merges with group
+# assignments from device_groups.json, and ships to Axiom as a lookup dataset.
+#
+# Run hourly via cron. The Axiom dataset contains: IP, MAC, name, and group
+# for every device, enabling dashboards to filter/aggregate by group.
 #
 # Install location: /home/pi/.firewalla/config/device_lookup_export.sh
 # =============================================================================
@@ -12,6 +15,7 @@ set -euo pipefail
 
 CONFIG_DIR="/home/pi/.firewalla/config"
 ENV_FILE="${CONFIG_DIR}/log_shipping.env"
+GROUP_FILE="${CONFIG_DIR}/device_groups.json"
 TMPFILE="/tmp/device_lookup.json"
 
 # --- Load environment variables ----------------------------------------------
@@ -26,6 +30,21 @@ LOOKUP_DATASET="${AXIOM_LOOKUP_DATASET:-${AXIOM_DATASET}-devices}"
 if [ -z "${AXIOM_API_TOKEN:-}" ]; then
     echo "[device-lookup] ERROR: AXIOM_API_TOKEN not set"
     exit 1
+fi
+
+# --- Build MAC → group lookup from device_groups.json ------------------------
+# We use a temp file as a simple key-value store since bash associative arrays
+# aren't available on all Firewalla firmware versions.
+GROUP_LOOKUP="/tmp/device_group_lookup.txt"
+echo -n "" > "$GROUP_LOOKUP"
+
+if [ -f "$GROUP_FILE" ]; then
+    # Extract mac|group pairs from the JSON
+    grep '"mac"' "$GROUP_FILE" | while IFS= read -r line; do
+        MAC=$(echo "$line" | sed 's/.*"mac": *"\([^"]*\)".*/\1/')
+        GROUP=$(echo "$line" | sed 's/.*"group": *"\([^"]*\)".*/\1/')
+        echo "${MAC}|${GROUP}" >> "$GROUP_LOOKUP"
+    done
 fi
 
 # --- Extract device mappings from Redis --------------------------------------
@@ -47,8 +66,18 @@ for key in $(redis-cli keys "host:mac:*" 2>/dev/null); do
     # Use bname → dhcpName → MAC as fallback chain
     NAME="${BNAME:-${DHCP_NAME:-${MAC:-unknown}}}"
 
+    # Look up group from the mapping file (default to "Ungrouped")
+    GROUP="Ungrouped"
+    if [ -n "$MAC" ] && [ -f "$GROUP_LOOKUP" ]; then
+        MATCH=$(grep -i "^${MAC}|" "$GROUP_LOOKUP" 2>/dev/null || true)
+        if [ -n "$MATCH" ]; then
+            GROUP=$(echo "$MATCH" | cut -d'|' -f2)
+        fi
+    fi
+
     # Sanitize: keep only safe characters for JSON
     NAME=$(echo "$NAME" | tr -cd '[:alnum:] ._-')
+    GROUP=$(echo "$GROUP" | tr -cd '[:alnum:] ._-')
 
     if [ "$FIRST" = true ]; then
         FIRST=false
@@ -57,7 +86,7 @@ for key in $(redis-cli keys "host:mac:*" 2>/dev/null); do
     fi
 
     cat >> "$TMPFILE" <<EOF
-{"_time":"${TIMESTAMP}","record_type":"device_lookup","ipv4":"${IPV4}","name":"${NAME}","mac":"${MAC}","interface":"${INTF_PORT}"}
+{"_time":"${TIMESTAMP}","record_type":"device_lookup","ipv4":"${IPV4}","name":"${NAME}","mac":"${MAC}","group":"${GROUP}","interface":"${INTF_PORT}"}
 EOF
 
 done
@@ -77,10 +106,11 @@ HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -n 1)
 
 if [ "$HTTP_CODE" = "200" ]; then
     DEVICE_COUNT=$(grep -c '"record_type"' "$TMPFILE" || echo 0)
-    echo "[device-lookup] Exported ${DEVICE_COUNT} devices to ${LOOKUP_DATASET}"
+    GROUPED=$(grep -c '"group":"[^U]' "$TMPFILE" 2>/dev/null || echo 0)
+    echo "[device-lookup] Exported ${DEVICE_COUNT} devices (${GROUPED} with groups) to ${LOOKUP_DATASET}"
 else
     echo "[device-lookup] ERROR: HTTP ${HTTP_CODE}"
     echo "[device-lookup] Response: ${HTTP_BODY}"
 fi
 
-rm -f "$TMPFILE"
+rm -f "$TMPFILE" "$GROUP_LOOKUP"

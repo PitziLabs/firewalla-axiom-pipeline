@@ -148,3 +148,156 @@ Not:
 ```kusto
 | extend source_ip = tostring(parsed.id.orig_h)  // WRONG — treats as nested path
 ```
+
+## Group-based dashboards
+
+These queries require the `group` field in your devices dataset, which is
+populated by the updated `device_lookup_export.sh` reading from `device_groups.json`.
+
+### DNS volume by group (pie chart)
+
+Shows which device groups generate the most DNS traffic.
+
+```kusto
+['firewalla']
+| where log_source == "zeek_dns"
+| extend parsed = parse_json(log)
+| extend source_ip = tostring(parsed["id.orig_h"])
+| join kind=leftouter (
+    ['firewalla-devices']
+    | where record_type == "device_lookup"
+    | distinct ipv4, group
+) on $left.source_ip == $right.ipv4
+| extend device_group = coalesce(group, "Unknown")
+| summarize query_count = count() by device_group
+| order by query_count desc
+```
+
+### Group activity over time (stacked time series)
+
+Shows the household rhythm — work spikes weekday mornings, entertainment
+ramps up evenings, IoT is constant.
+
+```kusto
+['firewalla']
+| where log_source == "zeek_dns"
+| extend parsed = parse_json(log)
+| extend source_ip = tostring(parsed["id.orig_h"])
+| join kind=leftouter (
+    ['firewalla-devices']
+    | where record_type == "device_lookup"
+    | distinct ipv4, group
+) on $left.source_ip == $right.ipv4
+| extend device_group = coalesce(group, "Unknown")
+| summarize queries = count() by bin_auto(_time), device_group
+```
+
+### Group dashboard with filter bar
+
+Add a **Filter Bar** with a group selector:
+
+- Filter name: `Group`
+- Filter ID: `_group`
+- Value: **Query**
+
+```kusto
+['firewalla-devices']
+| where record_type == "device_lookup"
+| distinct group
+| project key=group, value=group
+| sort by key asc
+```
+
+Then use this in chart queries:
+
+```kusto
+declare query_parameters(_group:string = "");
+['firewalla']
+| where log_source == "zeek_dns"
+| extend parsed = parse_json(log)
+| extend source_ip = tostring(parsed["id.orig_h"]), domain = tostring(parsed["query"])
+| where domain != "" and domain != "*"
+| join kind=inner (
+    ['firewalla-devices']
+    | where record_type == "device_lookup"
+    | where group == _group
+    | distinct ipv4, name
+) on $left.source_ip == $right.ipv4
+| summarize query_count = count() by name, domain
+| order by query_count desc
+```
+
+### IoT Accountability Board
+
+Shows exactly what your smart home devices are phoning home to.
+
+```kusto
+['firewalla']
+| where log_source == "zeek_dns"
+| extend parsed = parse_json(log)
+| extend source_ip = tostring(parsed["id.orig_h"]), domain = tostring(parsed["query"])
+| where domain != "" and domain != "*"
+| join kind=inner (
+    ['firewalla-devices']
+    | where record_type == "device_lookup"
+    | where group == "IoT" or group == "Smart Home"
+    | distinct ipv4, name
+) on $left.source_ip == $right.ipv4
+| summarize query_count = count() by name, domain
+| order by query_count desc
+```
+
+### New Domain Radar
+
+Finds domains queried for the first time today by any device. A sudden
+burst of new domains from an IoT device is a strong compromise signal.
+
+```kusto
+let today_domains =
+['firewalla']
+| where log_source == "zeek_dns"
+| where _time > ago(24h)
+| extend parsed = parse_json(log)
+| extend source_ip = tostring(parsed["id.orig_h"]), domain = tostring(parsed["query"])
+| where domain != "" and domain != "*"
+| distinct source_ip, domain;
+let historical_domains =
+['firewalla']
+| where log_source == "zeek_dns"
+| where _time > ago(30d) and _time < ago(24h)
+| extend parsed = parse_json(log)
+| extend domain = tostring(parse_json(log)["query"])
+| where domain != "" and domain != "*"
+| distinct domain;
+today_domains
+| join kind=leftanti historical_domains on domain
+| join kind=leftouter (
+    ['firewalla-devices']
+    | where record_type == "device_lookup"
+    | distinct ipv4, name, group
+) on $left.source_ip == $right.ipv4
+| summarize new_domains = dcount(domain), domains = make_set(domain) by name, group
+| order by new_domains desc
+```
+
+### Kids Activity Summary
+
+Quick view of what the kids' devices are doing — great for screen time conversations.
+
+```kusto
+declare query_parameters(_group:string = "Kids");
+['firewalla']
+| where log_source == "zeek_dns"
+| extend parsed = parse_json(log)
+| extend source_ip = tostring(parsed["id.orig_h"]), domain = tostring(parsed["query"])
+| where domain != "" and domain != "*"
+| join kind=inner (
+    ['firewalla-devices']
+    | where record_type == "device_lookup"
+    | where group == _group or group == "Kids-TVs"
+    | distinct ipv4, name
+) on $left.source_ip == $right.ipv4
+| summarize query_count = count() by name, domain
+| order by query_count desc
+```
+
