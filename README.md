@@ -17,27 +17,75 @@ Total cost: **$0/month** (Axiom free tier: 500 GB/month, 30-day retention)
 ## Architecture
 
 ```
-Firewalla Gold SE (ARM64, 4 GB RAM)
-│
-├── Fluent Bit (Docker, ~26-50 MB RAM)
-│   ├── tail: /bspool/manager/dns.log   (Zeek DNS — every DNS query)
-│   ├── tail: /bspool/manager/conn.log  (Zeek conn — every connection)
-│   ├── tail: /alog/acl-alarm.log       (Firewalla blocked connections)
-│   └── output: HTTPS → Axiom ingest API
-│
-├── device_lookup_export.sh (cron, hourly)
-│   ├── reads: Redis host:mac:* keys (device inventory)
-│   └── output: HTTPS → Axiom ingest API (device name ↔ IP mapping)
-│
-└── post_main.d/start_log_shipping.sh
-    └── re-launches Fluent Bit after reboot or firmware update
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    Firewalla Gold SE  (ARM64, 4 GB RAM)                │
+│                                                                         │
+│  ┌──────────────────────┐    ┌────────────────────────────────────┐    │
+│  │        Zeek           │    │           Redis                    │    │
+│  │  (built-in, always on)│    │     host:mac:* device inventory   │    │
+│  │                        │    └──────────────┬───────────────────┘    │
+│  │  dns.log    conn.log   │                   │                        │
+│  │  /bspool/manager/      │                   │ redis-cli hgetall      │
+│  └──────┬──────┬──────────┘                   │                        │
+│         │      │                              │                        │
+│         │      │  /alog/                      ▼                        │
+│         │      │  acl-alarm.log  ┌────────────────────────────┐       │
+│         │      │       │         │  device_lookup_export.sh   │       │
+│         │      │       │         │  (cron: hourly + @reboot)  │       │
+│         ▼      ▼       ▼         └─────────────┬──────────────┘       │
+│  ┌──────────────────────────┐                  │                       │
+│  │  Fluent Bit  (Docker)    │                  │                       │
+│  │  ~26-50 MB RAM           │                  │                       │
+│  │                          │                  │                       │
+│  │  INPUT  tail  zeek.dns   │                  │                       │
+│  │  INPUT  tail  zeek.conn  │                  │                       │
+│  │  INPUT  tail  fw.acl     │                  │                       │
+│  │  FILTER record_modifier  │                  │                       │
+│  │  OUTPUT http → Axiom API │                  │                       │
+│  └────────────┬─────────────┘                  │                       │
+│               │                                │                       │
+│  ┌────────────────────────────────┐            │                       │
+│  │  post_main.d/                  │            │                       │
+│  │  start_log_shipping.sh         │            │                       │
+│  │  (re-launches after firmware   │            │                       │
+│  │   update or reboot)            │            │                       │
+│  └────────────────────────────────┘            │                       │
+│               │                                │                       │
+│  ┌────────────────────────────────┐            │                       │
+│  │  cron: bspool cleanup (5 min) │            │                       │
+│  │  deletes rotated Zeek logs    │            │                       │
+│  │  prevents tmpfs overflow      │            │                       │
+│  └────────────────────────────────┘            │                       │
+└───────────────┼────────────────────────────────┼───────────────────────┘
+                │                                │
+                │  HTTPS (outbound only)         │  HTTPS POST
+                │  port 443                      │  curl → Axiom API
+                ▼                                ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     Axiom Cloud  (Free Tier)                           │
+│                     500 GB/month · 30-day retention                    │
+│                                                                         │
+│  ┌───────────────────────┐    ┌───────────────────────────────────┐   │
+│  │  firewalla  dataset   │    │  firewalla-devices  dataset       │   │
+│  │                       │    │                                   │   │
+│  │  • DNS queries        │    │  • IP ↔ device name mappings     │   │
+│  │  • Connection flows   │◄───┤  • MAC addresses                 │   │
+│  │  • ACL blocked events │join│  • DHCP names                    │   │
+│  └───────────┬───────────┘    └───────────────────────────────────┘   │
+│              │                                                         │
+│              ▼                                                         │
+│  ┌───────────────────────────────────────────────────────────────┐    │
+│  │  Axiom Dashboard  (APL queries)                               │    │
+│  │                                                               │    │
+│  │  • Top domains across all devices                             │    │
+│  │  • Per-device domain drill-down  (filter bar: _device)        │    │
+│  │  • DNS activity over time                                     │    │
+│  │  • Device name enrichment via leftouter join                  │    │
+│  └───────────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
 
-         ↓ HTTPS (outbound only, no inbound ports needed)
-
-Axiom Cloud (Free Tier)
-├── cjp-firewalla         ← DNS/conn/ACL log events
-├── cjp-firewalla-devices ← device IP-to-name lookup table
-└── Dashboard: per-device domain drill-down
+Deploy from workstation:
+  ./deploy.sh <firewalla-ip>  ──── SSH/SCP ────►  Firewalla
 ```
 
 ## Prerequisites
