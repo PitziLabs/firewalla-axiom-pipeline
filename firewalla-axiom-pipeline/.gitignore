@@ -1,0 +1,12 @@
+# Secrets — never commit these
+.env
+*.env
+log_shipping.env
+
+# Temp files
+/tmp/
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
