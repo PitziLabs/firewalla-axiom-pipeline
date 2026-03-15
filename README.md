@@ -16,29 +16,8 @@ Total cost: **$0/month** (Axiom free tier: 500 GB/month, 30-day retention)
 
 ## Architecture
 
-```
-Firewalla Gold SE (ARM64, 4 GB RAM)
-│
-├── Fluent Bit (Docker, ~26-50 MB RAM)
-│   ├── tail: /bspool/manager/dns.log   (Zeek DNS — every DNS query)
-│   ├── tail: /bspool/manager/conn.log  (Zeek conn — every connection)
-│   ├── tail: /alog/acl-alarm.log       (Firewalla blocked connections)
-│   └── output: HTTPS → Axiom ingest API
-│
-├── device_lookup_export.sh (cron, hourly)
-│   ├── reads: Redis host:mac:* keys (device inventory)
-│   └── output: HTTPS → Axiom ingest API (device name ↔ IP mapping)
-│
-└── post_main.d/start_log_shipping.sh
-    └── re-launches Fluent Bit after reboot or firmware update
+![Pipeline Architecture](docs/architecture.svg)
 
-         ↓ HTTPS (outbound only, no inbound ports needed)
-
-Axiom Cloud (Free Tier)
-├── cjp-firewalla         ← DNS/conn/ACL log events
-├── cjp-firewalla-devices ← device IP-to-name lookup table
-└── Dashboard: per-device domain drill-down
-```
 
 ## Prerequisites
 
