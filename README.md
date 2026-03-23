@@ -240,9 +240,19 @@ This was built for a specific home network setup (Firewalla Gold SE → Axiom). 
 - IPv6 device name resolution
 - Terraform/IaC for Axiom dataset and dashboard provisioning
 
+## Related
+
+- **[PitziLabs/setup-crostini-lab](https://github.com/PitziLabs/setup-crostini-lab)** — Chromebook bootstrap script for the same homelab environment
+- **[cpitzi/setup-xubuntu-lab](https://github.com/cpitzi/setup-xubuntu-lab)** — Xubuntu VM workstation bootstrap (where the dashboards get built)
+- **[PitziLabs/aws-lab-infra](https://github.com/PitziLabs/aws-lab-infra)** — Terraform AWS lab — same infrastructure-as-portfolio philosophy
+
 ## License
 
-MIT
+MIT License — see [LICENSE](LICENSE).
+
+## Credits
+
+Built iteratively with [Claude](https://claude.ai) (Anthropic) through multi-session pair-programming that included live debugging on the Firewalla over SSH, Fluent Bit container troubleshooting, Axiom APL query development, and the discovery that Zeek lowercases MACs while Redis stores them uppercase.
 
 ## Acknowledgments
 
