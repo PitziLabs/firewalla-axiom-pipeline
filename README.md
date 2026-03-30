@@ -40,7 +40,7 @@ Total cost: **$0/month** (Axiom free tier: 500 GB/month, 30-day retention)
 ### 2. Clone this repo and configure
 
 ```bash
-git clone https://github.com/cpitzi/firewalla-axiom-pipeline.git
+git clone https://github.com/PitziLabs/firewalla-axiom-pipeline.git
 cd firewalla-axiom-pipeline
 
 # Create your local env file (not committed to git)
