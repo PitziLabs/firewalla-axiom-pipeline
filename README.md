@@ -242,8 +242,8 @@ This was built for a specific home network setup (Firewalla Gold SE → Axiom). 
 
 ## Related
 
-- **[PitziLabs/setup-crostini-lab](https://github.com/PitziLabs/setup-crostini-lab)** — Chromebook bootstrap script for the same homelab environment
-- **[cpitzi/setup-xubuntu-lab](https://github.com/cpitzi/setup-xubuntu-lab)** — Xubuntu VM workstation bootstrap (where the dashboards get built)
+- **[PitziLabs/firewalla-grafana-stack](https://github.com/PitziLabs/firewalla-grafana-stack)** — Self-hosted Grafana + Loki observability stack for Firewalla, fed by Fluent Bit
+- **[PitziLabs/workstation-bootstrap](https://github.com/PitziLabs/workstation-bootstrap)** — Workstation bootstrap scripts for the same homelab environment
 - **[PitziLabs/aws-lab-infra](https://github.com/PitziLabs/aws-lab-infra)** — Terraform AWS lab — same infrastructure-as-portfolio philosophy
 
 ## License
