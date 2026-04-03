@@ -20,15 +20,43 @@ set -euo pipefail
 CONTAINER_NAME="fluent-bit-axiom"
 LOGFILE="/home/pi/.firewalla/config/fluent-bit-healthcheck.log"
 CHECK_WINDOW="5m"
+ENV_FILE="/home/pi/.firewalla/config/log_shipping.env"
+
+# ── Load environment variables ────────────────────────────────────────────────
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$ENV_FILE"
+    set +a
+fi
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [healthcheck] $1" >> "$LOGFILE"
 }
 
+# ── Emit restart metric to Axiom (fire-and-forget) ────────────────────────────
+emit_restart_metric() {
+    local reason="$1"
+    local timestamp
+    timestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+
+    if [ -z "${AXIOM_API_TOKEN:-}" ] || [ -z "${AXIOM_DATASET:-}" ]; then
+        return 0
+    fi
+
+    curl --silent --max-time 5 \
+        -H "Authorization: Bearer ${AXIOM_API_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "[{\"_time\":\"${timestamp}\",\"event_type\":\"health_check_restart\",\"reason\":\"${reason}\"}]" \
+        "https://api.axiom.co/v1/datasets/${AXIOM_DATASET}/ingest" \
+        >/dev/null 2>&1 &
+}
+
 # --- Is the container even running? ------------------------------------------
 if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     log "Container not running — starting via post_main.d script"
-    sudo /home/pi/.firewalla/config/post_main.d/start_log_shipping.sh >> "$LOGFILE" 2>&1
+    emit_restart_metric "container_not_running"
+    sudo /home/pi/.firewalla/config/post_main.d/start_log_shipping.sh 2>&1 | tee -a "$LOGFILE" >/dev/null
     exit 0
 fi
 
@@ -40,6 +68,7 @@ RECENT_LOGS=$(docker logs --since "$CHECK_WINDOW" "$CONTAINER_NAME" 2>&1)
 # 5 minutes of silence means it's frozen or the container is wedged.
 if [ -z "$RECENT_LOGS" ]; then
     log "WARNING: No output in last ${CHECK_WINDOW} — restarting"
+    emit_restart_metric "no output in last ${CHECK_WINDOW}"
     docker restart "$CONTAINER_NAME" >> "$LOGFILE" 2>&1
     log "Container restarted (reason: no output)"
     exit 0
@@ -54,6 +83,7 @@ fi
 
 ERROR_COUNT=$(echo "$RECENT_LOGS" | grep -c '\[error\]' 2>/dev/null || echo 0)
 WARN_COUNT=$(echo "$RECENT_LOGS" | grep -c '\[ warn\]' 2>/dev/null || echo 0)
+# shellcheck disable=SC2034  # tracked for future use
 RETRY_COUNT=$(echo "$RECENT_LOGS" | grep -c 'retry in' 2>/dev/null || echo 0)
 
 # If there are retries happening, Fluent Bit is actively trying but failing
@@ -80,6 +110,7 @@ if [ "$TOTAL_LINES" -gt 0 ]; then
     if [ "$ERROR_RATIO" -gt 80 ]; then
         log "WARNING: ${ERROR_RATIO}% error rate (${ERROR_LINES}/${TOTAL_LINES} lines) — restarting"
         log "Last errors: $(echo "$RECENT_LOGS" | grep '\[error\]' | tail -3)"
+        emit_restart_metric "high error rate: ${ERROR_RATIO}% (${ERROR_LINES}/${TOTAL_LINES} lines)"
         docker restart "$CONTAINER_NAME" >> "$LOGFILE" 2>&1
         log "Container restarted (reason: high error rate)"
         exit 0
