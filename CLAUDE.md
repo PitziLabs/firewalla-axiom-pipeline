@@ -128,3 +128,14 @@ The deploy script performs these steps in order:
 - **Test deploy.sh changes carefully** — it runs over SSH on a production network appliance
 - **Keep .env out of git** — it's in `.gitignore`; use `env.example` as the template
 - **Axiom free tier constraints** — 500 GB/month ingest, 30-day retention; avoid high-cardinality explosions
+
+## CI/CD
+
+- **ShellCheck** (`.github/workflows/shellcheck.yml`): Static analysis on every
+  non-draft PR. Severity: warning+. Required status check.
+- **Claude Code Review** (`.github/workflows/claude-code-review.yml`): Automated
+  review focused on appliance safety, secret handling, dependency creep, and
+  bash correctness. Required status check.
+- **Claude Code** (`.github/workflows/claude.yml`): Triggered by `@claude` in
+  issues/PR comments. Implements changes, creates PRs with auto-merge.
+- **Auto-merge**: PRs merge automatically when ShellCheck and review pass.
