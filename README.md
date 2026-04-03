@@ -109,6 +109,8 @@ firewalla-axiom-pipeline/
 │   └── user_crontab                     # Persistent cron jobs
 ├── dashboards/
 │   └── axiom-queries.md                 # Saved APL queries for Axiom
+├── docs/
+│   └── zeek-field-reference.md          # Complete Zeek JSON field reference
 └── deploy.sh                            # One-command deploy script
 ```
 
@@ -147,6 +149,8 @@ On recent firmware, Zeek logs are written as **JSON** (not TSV). Key fields in `
 - `answers` — DNS response
 
 Note: field names contain dots (e.g., `id.orig_h`), which requires bracket notation in APL: `parsed["id.orig_h"]`.
+
+For the complete field reference covering all `dns.log` and `conn.log` fields, gotchas, and example raw events, see **[docs/zeek-field-reference.md](docs/zeek-field-reference.md)**.
 
 ## Troubleshooting
 
