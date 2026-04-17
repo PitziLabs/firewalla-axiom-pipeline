@@ -18,6 +18,7 @@ IMAGE="fluent/fluent-bit:latest"
 # --- Load environment variables ----------------------------------------------
 if [ -f "$ENV_FILE" ]; then
     set -a
+    # shellcheck source=/dev/null
     source "$ENV_FILE"
     set +a
 else
@@ -35,7 +36,7 @@ fi
 
 # --- Wait for Docker ---------------------------------------------------------
 echo "[log-shipping] Waiting for Docker daemon..."
-for i in $(seq 1 30); do
+for _i in $(seq 1 30); do
     if docker info >/dev/null 2>&1; then
         break
     fi
