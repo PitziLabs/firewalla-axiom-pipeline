@@ -36,7 +36,7 @@ fi
 
 # --- Wait for Docker ---------------------------------------------------------
 echo "[log-shipping] Waiting for Docker daemon..."
-for _ in $(seq 1 30); do
+for _i in $(seq 1 30); do
     if docker info >/dev/null 2>&1; then
         break
     fi
