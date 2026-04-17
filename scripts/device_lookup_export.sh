@@ -21,6 +21,7 @@ TMPFILE="/tmp/device_lookup.json"
 # --- Load environment variables ----------------------------------------------
 if [ -f "$ENV_FILE" ]; then
     set -a
+    # shellcheck source=/dev/null
     source "$ENV_FILE"
     set +a
 fi
