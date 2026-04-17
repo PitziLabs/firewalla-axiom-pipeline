@@ -128,6 +128,7 @@ The deploy script performs these steps in order:
 - **Test deploy.sh changes carefully** — it runs over SSH on a production network appliance
 - **Keep .env out of git** — it's in `.gitignore`; use `env.example` as the template
 - **Axiom free tier constraints** — 500 GB/month ingest, 30-day retention; avoid high-cardinality explosions
+- **Open a pull request as the final step** — do not stop at "pushed the branch." PR title should match or clearly refine the issue title. PR body must include `Closes #<number>` so merge closes the issue, plus a short summary of what changed and why. Do not merge the PR yourself; auto-merge handles it once checks pass.
 
 ## CI/CD
 
