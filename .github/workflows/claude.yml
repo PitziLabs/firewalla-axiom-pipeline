@@ -23,6 +23,12 @@ on:
 
 jobs:
   claude:
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
     uses: PitziLabs/shared-workflows/.github/workflows/claude-responder.yml@main
     secrets: inherit
     with:
