@@ -76,4 +76,5 @@ jobs:
               incrementally as you discover issues
           claude_args: |
             --max-turns 15
+            --model haiku
             --allowedTools "Bash(gh pr diff:*),Bash(gh pr view:*),Read"
