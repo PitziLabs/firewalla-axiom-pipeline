@@ -246,9 +246,9 @@ This was built for a specific home network setup (Firewalla Gold SE → Axiom). 
 
 ## Related
 
-- **[PitziLabs/firewalla-grafana-stack](https://github.com/PitziLabs/firewalla-grafana-stack)** — Self-hosted Grafana + Loki observability stack for Firewalla, fed by Fluent Bit
+- **[PitziLabs/homelab-observability](https://github.com/PitziLabs/homelab-observability)** — Grafana Cloud + Alloy observability stack for the Firewalla home network
 - **[PitziLabs/workstation-bootstrap](https://github.com/PitziLabs/workstation-bootstrap)** — Workstation bootstrap scripts for the same homelab environment
-- **[PitziLabs/aws-lab-infra](https://github.com/PitziLabs/aws-lab-infra)** — Terraform AWS lab — same infrastructure-as-portfolio philosophy
+- **[PitziLabs/foundry-platform-demo](https://github.com/PitziLabs/foundry-platform-demo)** — Terraform AWS lab — same infrastructure-as-portfolio philosophy
 
 ## License
 
