@@ -2,6 +2,8 @@
 
 Ship DNS and connection flow logs from a Firewalla Gold SE to [Axiom](https://axiom.co) for long-term retention, search, and dashboarding — at zero recurring cost.
 
+**Authorship:** The Fluent Bit configs, bash scripts, APL queries, and documentation in this repo are co-written with [Claude](https://claude.ai) (Anthropic). I direct the work and review the output; Claude writes the code. I'm an infrastructure operator, not a software engineer — please don't read this repo as a portfolio of coding ability.
+
 ## What this does
 
 Your Firewalla app shows you what domains each device visits, but the data rotates off the device quickly. This pipeline captures that same data (Zeek DNS and connection logs) and ships it to Axiom's cloud, giving you:
@@ -256,7 +258,7 @@ MIT License — see [LICENSE](LICENSE).
 
 ## Credits
 
-Built iteratively with [Claude](https://claude.ai) (Anthropic) through multi-session pair-programming that included live debugging on the Firewalla over SSH, Fluent Bit container troubleshooting, Axiom APL query development, and the discovery that Zeek lowercases MACs while Redis stores them uppercase.
+See the Authorship note at the top — the code in this repo is co-written with [Claude](https://claude.ai) (Anthropic). The work spanned multi-session pair-programming with live debugging on the Firewalla over SSH, Fluent Bit container troubleshooting, Axiom APL query development, and the discovery that Zeek lowercases MACs while Redis stores them uppercase.
 
 ## Acknowledgments
 
