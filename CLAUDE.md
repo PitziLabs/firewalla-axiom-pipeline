@@ -7,9 +7,14 @@ A log-shipping pipeline that captures DNS queries, connection flows, and ACL blo
 ### Data Flow
 
 ```
-Firewalla Zeek logs ──► Fluent Bit (Docker) ──► Axiom "firewalla" dataset
+Firewalla Zeek logs (dns/conn/ssl) + acl-audit ──► Fluent Bit (Docker) ──┬─► Axiom "firewalla" dataset           (HTTP output, primary)
+                                                                          └─► LAN Loki receiver :3100             (loki output, optional)
+                                                                                                                  └─► Grafana Cloud Loki
+                                                                                                                       (via Alloy on LXC 105)
 Redis device inventory ──► device_lookup_export.sh ──► Axiom "firewalla-devices" dataset
 ```
+
+The Loki output is independent of the HTTP output — either path runs alone. The optional Loki receiver in our homelab is the Alloy container in [PitziLabs/homelab-observability](https://github.com/PitziLabs/homelab-observability); other consumers (Promtail, Vector, a self-hosted Loki) work too.
 
 ## Tech Stack
 
