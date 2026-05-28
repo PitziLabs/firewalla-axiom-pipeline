@@ -56,9 +56,28 @@ to the correct device — the original IP-based join missed all IPv6 queries.
 
 ### Blocked connections
 
+Raw stream:
+
 ```kusto
 ['firewalla']
 | where log_source == "firewalla_acl"
+```
+
+ACL events arrive as syslog/kernel `FW_ADT` lines (not Zeek JSON — see
+[docs/zeek-field-reference.md § acl-audit.log format](../docs/zeek-field-reference.md#acl-auditlog-format-different-from-zeek-logs)).
+Extract fields with `extract()` for richer panels:
+
+```kusto
+['firewalla']
+| where log_source == "firewalla_acl"
+| extend action = extract(@"A=([A-Z])", 1, log)        // C = closed, B = blocked
+| extend dir    = extract(@"D=([A-Z])", 1, log)        // O = outbound, I = inbound
+| extend src_ip = extract(@"SRC=(\S+)", 1, log)
+| extend dst_ip = extract(@"DST=(\S+)", 1, log)
+| extend dst_port = toint(extract(@"DPT=(\d+)", 1, log))
+| extend proto    = extract(@"PROTO=(\S+)", 1, log)
+| summarize blocks = count() by src_ip, dst_ip, dst_port, proto
+| order by blocks desc
 ```
 
 ### Inspect raw Zeek JSON structure

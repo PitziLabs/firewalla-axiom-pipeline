@@ -271,8 +271,111 @@ Both log types use `orig_l2_addr` as the device identifier for the join:
 
 ---
 
+## ssl.log fields
+
+Each row in `ssl.log` represents a TLS handshake observed on the network. This is
+the highest-signal log on an HTTPS-dominant network: DNS shows what got looked up,
+SSL shows what actually got connected to (the `server_name` SNI), plus the
+identifying handshake metadata that lets you fingerprint clients and services.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ts` | float | Unix epoch timestamp of the handshake. |
+| `uid` | string | Unique connection identifier. Joins to `conn.log` on the same `uid`. |
+| `id.orig_h` / `id.orig_p` | string / int | Source IP/port. |
+| `id.resp_h` / `id.resp_p` | string / int | Destination IP/port (typically `443`). |
+| `version` | string | Negotiated TLS version (e.g., `TLSv13`, `TLSv12`). |
+| `cipher` | string | Negotiated cipher suite (e.g., `TLS_AES_128_GCM_SHA256`). |
+| `curve` | string | Negotiated elliptic curve (e.g., `x25519`). Absent for older ciphers. |
+| `server_name` | string | **The SNI value sent by the client.** This is the field that tells you what site was visited even when DNS was over DoH/DoT. |
+| `resumed` | bool | `true` if the session was resumed (skips full handshake). |
+| `next_protocol` | string | ALPN-negotiated protocol (e.g., `h2`, `http/1.1`). |
+| `established` | bool | `true` if the handshake completed; `false` for client-aborted / failed handshakes. |
+| `ssl_history` | string | Compact character sequence describing handshake phases observed (Zeek's coarse JA3-equivalent). Useful for client fingerprinting. |
+| `cert_chain_fps` | array | SHA-1 fingerprints of certs in the server's chain, leaf-first. |
+| `client_cert_chain_fps` | array | Fingerprints of any client certs (rare). |
+| `subject` | string | Subject DN of the leaf cert. |
+| `issuer` | string | Issuer DN of the leaf cert. |
+| `validation_status` | string | Result of Zeek's cert validation (e.g., `ok`, `unable to get local issuer certificate`). |
+| `orig_l2_addr` | string | Source MAC — same field as in `dns.log` / `conn.log`. Use for device joins. |
+| `resp_l2_addr` | string | Destination MAC. |
+
+### Example ssl.log event (raw JSON)
+
+```json
+{
+  "ts": 1741737620.123,
+  "uid": "Cv9XXX...",
+  "id.orig_h": "192.168.1.42",
+  "id.orig_p": 51234,
+  "id.resp_h": "142.250.80.46",
+  "id.resp_p": 443,
+  "version": "TLSv13",
+  "cipher": "TLS_AES_128_GCM_SHA256",
+  "curve": "x25519",
+  "server_name": "www.google.com",
+  "resumed": false,
+  "next_protocol": "h2",
+  "established": true,
+  "ssl_history": "CssSh",
+  "cert_chain_fps": ["d6a7f4...", "a8b8c8..."],
+  "subject": "CN=www.google.com",
+  "issuer": "CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
+  "validation_status": "ok",
+  "orig_l2_addr": "e8:4c:4a:db:9c:e8",
+  "resp_l2_addr": "dc:a6:32:01:23:45"
+}
+```
+
+### APL pattern — what SNIs did each device hit?
+
+```kusto
+['firewalla']
+| where log_source == "zeek_ssl"
+| extend parsed     = parse_json(log)
+| extend source_mac = tostring(parsed["orig_l2_addr"])
+| extend sni        = tostring(parsed["server_name"])
+| where isnotempty(sni)
+| summarize hits = count() by source_mac, sni
+| order by hits desc
+```
+
+---
+
+## acl-audit.log format (different from Zeek logs)
+
+`/alog/acl-audit.log` is **not** Zeek JSON — it's the Firewalla kernel's
+iptables `FW_ADT` lines in standard syslog format. Fluent Bit ships the
+whole line as `log` with no parser, so APL/LogQL queries either treat
+the line as a raw search string or extract fields with a regex.
+
+### Example line
+
+```
+May 27 06:46:27 localhost kernel: [652156.583417] [FW_ADT]A=C D=O IN=br0 OUT=eth0 PHYSIN=eth3 MAC=20:6d:31:41:bc:7a:04:7b:cb:c1:4c:ca:08:00 SRC=192.168.139.152 DST=136.226.71.20 LEN=40 TOS=0x00 PREC=0x00 TTL=127 ID=59321 DF PROTO=TCP SPT=50853 DPT=443 WINDOW=255 RES=0x00 ACK FIN URGP=0 MARK=0x85010000
+```
+
+### Field-by-field
+
+| Field | Meaning |
+|-------|---------|
+| `[FW_ADT]` | Firewalla "audit" line marker — distinguishes block events from other kernel log noise. |
+| `A=C` / `A=B` | Action: `C` = closed (connection closed after match), `B` = blocked. |
+| `D=O` / `D=I` | Direction: `O` = outbound, `I` = inbound. |
+| `IN=` / `OUT=` | Interface names. `br0` = LAN bridge; `eth0` = WAN. |
+| `MAC=` | Concatenated source MAC + destination MAC + EtherType (15 bytes total). Source MAC = first 6 bytes. |
+| `SRC=` / `DST=` | Source / destination IPv4 address. |
+| `PROTO=` | Transport protocol (`TCP`, `UDP`, `ICMP`). |
+| `SPT=` / `DPT=` | Source / destination ports (TCP/UDP only). |
+| `MARK=` | iptables fwmark — encodes which Firewalla rule fired (decoder varies by firmware). |
+
+See [dashboards/axiom-queries.md](../dashboards/axiom-queries.md#blocked-connections) for an APL example that extracts `SRC`/`DST`/`DPT` from these lines.
+
+---
+
 ## Related
 
 - [dashboards/axiom-queries.md](../dashboards/axiom-queries.md) — full set of APL queries using these fields
 - [Zeek DNS log documentation](https://docs.zeek.org/en/master/scripts/base/protocols/dns/main.zeek.html)
 - [Zeek conn log documentation](https://docs.zeek.org/en/master/scripts/base/protocols/conn/main.zeek.html)
+- [Zeek SSL log documentation](https://docs.zeek.org/en/master/scripts/base/protocols/ssl/main.zeek.html)

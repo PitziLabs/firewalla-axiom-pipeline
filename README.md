@@ -134,7 +134,8 @@ This pipeline relies on the following Firewalla data sources:
 |--------|------|----------|
 | Zeek DNS log | `/bspool/manager/dns.log` | Every DNS query: source IP, domain, query type, response |
 | Zeek conn log | `/bspool/manager/conn.log` | Every connection: source, dest, port, bytes, duration |
-| ACL audit log | `/alog/acl-audit.log` | Blocked connections from Firewalla iptables rules |
+| Zeek SSL log | `/bspool/manager/ssl.log` | Every TLS handshake: SNI, version, cipher, JA3-style ssl_history, cert chain fingerprints |
+| ACL audit log | `/alog/acl-audit.log` | Blocked connections from Firewalla iptables rules (kernel `FW_ADT` lines, syslog-format) |
 | Redis device inventory | `redis-cli hgetall host:mac:*` | IP, MAC, device name, DHCP name, interface |
 
 ### Persistence across firmware updates
