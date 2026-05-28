@@ -81,7 +81,7 @@ firewalla-axiom-pipeline/
 | `/home/pi/.firewalla/config/post_main.d/` | Auto-run scripts after boot/firmware update |
 | `/bspool/manager/dns.log` | Zeek DNS log (tmpfs, 30 MB limit) |
 | `/bspool/manager/conn.log` | Zeek connection log |
-| `/alog/acl-alarm.log` | Firewalla ACL block log |
+| `/alog/acl-audit.log` | Firewalla ACL block log (kernel iptables FW_ADT lines) |
 | `/home/pi/.firewalla/config/log_shipping.env` | Deployed .env file on device |
 
 ## Environment Variables
