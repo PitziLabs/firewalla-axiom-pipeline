@@ -9,14 +9,12 @@
 
 name: Claude Code Review
 
+# >>> DISABLED 2026-06-25: automated Claude PR review turned off fleet-wide.
+# Trigger changed from `pull_request` to manual `workflow_dispatch` only, so it
+# never auto-runs on PRs. The repo-specific review_prompt below is preserved.
+# To re-enable, restore the `on: pull_request` trigger (see git history).
 on:
-  pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
-    paths-ignore:
-      - "*.md"
-      - "docs/**"
-      - "LICENSE"
-      - ".gitignore"
+  workflow_dispatch:
 
 jobs:
   claude-review:
